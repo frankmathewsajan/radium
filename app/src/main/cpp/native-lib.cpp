@@ -18,14 +18,14 @@ const unsigned char AES_KEY[32] = {
 using EvpCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, decltype(&::EVP_CIPHER_CTX_free)>;
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_radium_MainActivity_stringFromJNI(JNIEnv* env, jobject) {
-    std::string version = "RADIUM ENGINE v2.2 [STRICT_TYPE_SAFE]";
+Java_com_example_radium_RadioEngine_stringFromJNI(JNIEnv* env, jobject) {
+    std::string version = "RADIUM ENGINE v3.0 [ELYSIUM]";
     return env->NewStringUTF(version.c_str());
 }
 
 // ---- AES-256-GCM ENCRYPT (WITH ZLIB) ----
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_example_radium_MainActivity_processDataNative(JNIEnv* env, jobject, jstring input) {
+Java_com_example_radium_RadioEngine_processDataNative(JNIEnv* env, jobject, jstring input) {
     if (input == nullptr) return nullptr;
     const char *nativeString = env->GetStringUTFChars(input, nullptr);
     if (nativeString == nullptr) return nullptr;
@@ -87,7 +87,7 @@ Java_com_example_radium_MainActivity_processDataNative(JNIEnv* env, jobject, jst
 
 // ---- AES-256-GCM DECRYPT (WITH ZLIB) ----
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_radium_MainActivity_decodeDataNative(JNIEnv* env, jobject, jbyteArray input) {
+Java_com_example_radium_RadioEngine_decodeDataNative(JNIEnv* env, jobject, jbyteArray input) {
     jsize length = env->GetArrayLength(input);
     if (length < 28) return env->NewStringUTF("[ERR] Payload size failure");
 
@@ -133,7 +133,6 @@ Java_com_example_radium_MainActivity_decodeDataNative(JNIEnv* env, jobject, jbyt
 
     if (z_res != Z_OK) return env->NewStringUTF("[ERR] Zlib Failure");
 
-    // 3. FINAL STRING CONSTRUCTION (Typo fixed: decryptedtext -> final_data)
     std::string result_str(reinterpret_cast<char*>(final_data.data()), dest_len);
-    return env->NewStringUTF(("[VERIFIED]\n" + result_str).c_str());
+    return env->NewStringUTF(result_str.c_str());
 }

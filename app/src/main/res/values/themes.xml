@@ -1,14 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.Radium" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <item name="colorPrimary">#2E7D32</item>
-        <item name="colorPrimaryVariant">#1B5E20</item>
+    <style name="Theme.Radium" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/elysium_primary</item>
         <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/elysium_lavender</item>
+        <item name="colorSurface">@color/elysium_surface</item>
 
-        <item name="colorSecondary">#455A64</item>
-        <item name="colorOnSecondary">@color/white</item>
-
-        <item name="android:windowBackground">#F5F5F5</item>
-        <item name="android:statusBarColor">#F5F5F5</item>
+        <item name="android:windowBackground">@color/elysium_surface</item>
+        <item name="android:statusBarColor">@color/transparent</item>
+        <item name="android:navigationBarColor">@color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowTranslucentNavigation">false</item>
     </style>
 </resources>

@@ -1,5 +1,38 @@
 <resources>
     <string name="app_name">Radium</string>
+
+    <!-- Onboarding -->
+    <string name="welcome_title">Welcome to Radium</string>
+    <string name="welcome_subtitle">Your private channel over the airwaves</string>
+    <string name="perm_sms_title">SMS is our Data Cable</string>
+    <string name="perm_sms_desc">Radium sends encrypted packets over the cellular signaling plane. We need SMS access to transmit and receive your messages securely — no internet required.</string>
+    <string name="perm_receive_sms_title">Listen to the Airwaves</string>
+    <string name="perm_receive_sms_desc">To receive incoming encrypted packets from other Radium users, we need permission to intercept binary SMS data on port 8080.</string>
+    <string name="perm_phone_title">Read the Radio</string>
+    <string name="perm_phone_desc">We monitor signal strength (RSRP, RSRQ, SNR) to ensure the physical link can support transmission before dispatching packets.</string>
+    <string name="perm_location_title">Find the Tower</string>
+    <string name="perm_location_desc">Cell tower identification (PCI, EARFCN) requires location access. This helps us gauge transmission viability and diagnose radio drops.</string>
+    <string name="perm_contacts_title">Know Your Contacts</string>
+    <string name="perm_contacts_desc">Select recipients from your contact list instead of typing numbers manually. We never upload your contacts — everything stays on-device.</string>
+    <string name="btn_allow">Allow</string>
+    <string name="btn_skip">Skip</string>
+    <string name="btn_continue">Continue</string>
+    <string name="btn_get_started">Get Started</string>
+
+    <!-- Home -->
+    <string name="home_title">Conversations</string>
+    <string name="home_empty">No conversations yet.\nTap + to start one.</string>
+    <string name="new_chat">New Chat</string>
+    <string name="default_server">Default Server</string>
+    <string name="select_contacts">Select from Contacts</string>
+    <string name="enter_number">Enter number (E.164)</string>
+    <string name="btn_start_chat">Start Chat</string>
+
+    <!-- Chat -->
+    <string name="chat_hint">Type a message…</string>
+    <string name="status_identifying">Identifying tower…</string>
+
+    <!-- Legacy -->
     <string name="radium_system_monitor">RADIUM SYSTEM MONITOR</string>
     <string name="awaiting_system_initialization">Awaiting System Initialization…</string>
     <string name="execute_radio_probe">Execute Radio Probe</string>

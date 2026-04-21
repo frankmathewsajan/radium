@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_glass_card"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/new_chat"
+        android:textColor="@color/text_primary"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <EditText
+        android:id="@+id/inputNumber"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:hint="@string/enter_number"
+        android:inputType="phone"
+        android:maxLength="15"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_hint"
+        android:textSize="15sp"
+        android:background="@drawable/bg_glass_input"
+        android:paddingHorizontal="16dp"
+        android:layout_marginBottom="12dp" />
+
+    <Button
+        android:id="@+id/btnContacts"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:text="@string/select_contacts"
+        android:textColor="@color/elysium_primary"
+        android:textSize="14sp"
+        android:textAllCaps="false"
+        android:background="@android:color/transparent"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnStartChat"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/bg_button_primary"
+        android:text="@string/btn_start_chat"
+        android:textColor="@color/white"
+        android:textSize="15sp"
+        android:textAllCaps="false"
+        android:elevation="2dp" />
+</LinearLayout>

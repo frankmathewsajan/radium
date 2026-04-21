@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base gradient: mint → sky -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#E3F2FD"
+                android:centerColor="#F3E5F5"
+                android:endColor="#E8F5E9"
+                android:angle="135" />
+        </shape>
+    </item>
+    <!-- Overlay: warm cloud glow -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:startColor="#18FFE0B2"
+                android:centerColor="#10F8BBD0"
+                android:endColor="#00FFFFFF"
+                android:type="radial"
+                android:gradientRadius="600dp"
+                android:centerX="0.4"
+                android:centerY="0.2" />
+        </shape>
+    </item>
+</layer-list>
