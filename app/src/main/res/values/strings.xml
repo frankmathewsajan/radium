@@ -1,6 +1,11 @@
 <resources>
     <string name="app_name">Radium</string>
 
+    <!-- Welcome Gate -->
+    <string name="welcome_gate_title">Welcome to Radium.</string>
+    <string name="welcome_gate_subtitle">The Off-Grid Signaling Transceiver.</string>
+    <string name="welcome_gate_btn">Initialize Engine</string>
+
     <!-- Onboarding -->
     <string name="welcome_title">Welcome to Radium</string>
     <string name="welcome_subtitle">Your private channel over the airwaves</string>

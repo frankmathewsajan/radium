@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/welcomeRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_welcome_gradient">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingHorizontal="32dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/welcome_gate_title"
+            android:textColor="@color/text_primary"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:letterSpacing="-0.02" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/welcome_gate_subtitle"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp"
+            android:letterSpacing="0.01" />
+
+        <Button
+            android:id="@+id/btnInitialize"
+            android:layout_width="240dp"
+            android:layout_height="52dp"
+            android:layout_marginTop="48dp"
+            android:background="@drawable/bg_frosted_button"
+            android:text="@string/welcome_gate_btn"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textAllCaps="false"
+            android:letterSpacing="0.04"
+            android:elevation="4dp" />
+    </LinearLayout>
+</FrameLayout>

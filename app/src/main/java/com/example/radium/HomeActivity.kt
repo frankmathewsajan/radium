@@ -41,9 +41,10 @@ class HomeActivity : AppCompatActivity() {
         ), null, null, null)
         cursor?.use {
             if (it.moveToFirst()) {
-                val number = it.getString(0) ?: return@use
-                val name = it.getString(1) ?: number
-                openChat(number.replace(" ", ""), name)
+                val raw = it.getString(0) ?: return@use
+                val name = it.getString(1) ?: raw
+                val clean = raw.replace(Regex("[^0-9+]"), "")
+                if (clean.isNotEmpty()) openChat(clean, name)
             }
         }
     }
@@ -103,7 +104,8 @@ class HomeActivity : AppCompatActivity() {
             }
         }
         dialogBinding.btnStartChat.setOnClickListener {
-            val number = dialogBinding.inputNumber.text.toString().trim()
+            val raw = dialogBinding.inputNumber.text.toString().trim()
+            val number = raw.replace(Regex("[^0-9+]"), "")
             if (number.isNotEmpty()) {
                 openChat(number, number)
                 dialog.dismiss()

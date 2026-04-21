@@ -24,7 +24,7 @@
         android:theme="@style/Theme.Radium">
 
         <activity
-            android:name=".OnboardingActivity"
+            android:name=".WelcomeActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -32,6 +32,7 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".OnboardingActivity" android:exported="false" />
         <activity android:name=".HomeActivity" android:exported="false" />
         <activity android:name=".ChatActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
