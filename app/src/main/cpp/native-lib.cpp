@@ -36,19 +36,19 @@ Java_com_example_radium_MainActivity_processDataNative(JNIEnv* env, jobject, jst
     // 1. ZLIB COMPRESSION
     uLongf compressed_len = compressBound(static_cast<uLong>(plaintext.length()));
     std::vector<unsigned char> compressed_data(compressed_len);
-    
-    if (compress(compressed_data.data(), &compressed_len, 
-                 reinterpret_cast<const Bytef*>(plaintext.data()), 
+
+    if (compress(compressed_data.data(), &compressed_len,
+                 reinterpret_cast<const Bytef*>(plaintext.data()),
                  static_cast<uLong>(plaintext.length())) != Z_OK) {
         return nullptr;
     }
     compressed_data.resize(compressed_len);
 
     // 2. PREPARE PAYLOAD [Original Size (4b)] + [Compressed Data]
-    uint32_t original_size = static_cast<uint32_t>(plaintext.length());
+    auto original_size = static_cast<uint32_t>(plaintext.length());
     std::vector<unsigned char> pre_encryption_blob;
     pre_encryption_blob.reserve(4 + compressed_len);
-    
+
     pre_encryption_blob.push_back(static_cast<unsigned char>((original_size >> 24) & 0xFF));
     pre_encryption_blob.push_back(static_cast<unsigned char>((original_size >> 16) & 0xFF));
     pre_encryption_blob.push_back(static_cast<unsigned char>((original_size >> 8) & 0xFF));
@@ -119,16 +119,16 @@ Java_com_example_radium_MainActivity_decodeDataNative(JNIEnv* env, jobject, jbyt
     if (decrypted_blob_len < 4) return env->NewStringUTF("[ERR] Header Truncated");
 
     // 2. ZLIB DECOMPRESSION
-    uint32_t original_size = (static_cast<uint32_t>(decrypted_blob[0]) << 24) | 
-                             (static_cast<uint32_t>(decrypted_blob[1]) << 16) | 
-                             (static_cast<uint32_t>(decrypted_blob[2]) << 8)  | 
+    uint32_t original_size = (static_cast<uint32_t>(decrypted_blob[0]) << 24) |
+                             (static_cast<uint32_t>(decrypted_blob[1]) << 16) |
+                             (static_cast<uint32_t>(decrypted_blob[2]) << 8)  |
                              static_cast<uint32_t>(decrypted_blob[3]);
 
     std::vector<unsigned char> final_data(original_size);
-    uLongf dest_len = static_cast<uLongf>(original_size);
+    auto dest_len = static_cast<uLongf>(original_size);
 
-    int z_res = uncompress(final_data.data(), &dest_len, 
-                           decrypted_blob.data() + 4, 
+    int z_res = uncompress(final_data.data(), &dest_len,
+                           decrypted_blob.data() + 4,
                            static_cast<uLong>(decrypted_blob_len - 4));
 
     if (z_res != Z_OK) return env->NewStringUTF("[ERR] Zlib Failure");
