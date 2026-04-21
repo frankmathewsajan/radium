@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="#F5F5F5">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="RADIUM SYSTEM MONITOR"
+        android:textColor="#1B5E20"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="12dp" />
+
+    <TextView
+        android:id="@+id/networkStatusHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Status: Identifying..."
+        android:textColor="#424242"
+        android:textSize="18sp"
+        android:layout_marginBottom="16dp" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="2dp"
+        android:background="@drawable/telemetry_border"
+        android:layout_marginBottom="16dp">
+
+        <ScrollView
+            android:id="@+id/telemetryScroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="12dp"
+            android:scrollbarStyle="outsideOverlay">
+
+            <TextView
+                android:id="@+id/telemetryDisplay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="[SYSTEM] Awaiting Probe..."
+                android:textColor="#212121"
+                android:textSize="13sp"
+                android:lineSpacingExtra="4dp" />
+        </ScrollView>
+    </FrameLayout>
+
+    <EditText
+        android:id="@+id/targetNumberInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Target Number (e.g. +91...)"
+        android:inputType="phone"
+        android:maxLength="15"
+        android:layout_marginBottom="8dp" />
+
+    <EditText
+        android:id="@+id/payloadInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Secret Payload"
+        android:inputType="text"
+        android:layout_marginBottom="12dp" />
+
+    <Button
+        android:id="@+id/probeButton"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Execute Radio Probe"
+        android:backgroundTint="#2E7D32" />
+
+    <Button
+        android:id="@+id/smsButton"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Dispatch Data SMS"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="#455A64" />
+
+</LinearLayout>

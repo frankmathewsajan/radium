@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Radium</string>
+    <string name="radium_system_monitor">RADIUM SYSTEM MONITOR</string>
+    <string name="awaiting_system_initialization">Awaiting System Initialization…</string>
+    <string name="execute_radio_probe">Execute Radio Probe</string>
+    <string name="dispatch_data_sms">Dispatch Data SMS</string>
+</resources>
