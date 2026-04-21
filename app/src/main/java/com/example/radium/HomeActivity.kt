@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.database.Cursor
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.view.View
@@ -35,18 +34,32 @@ class HomeActivity : AppCompatActivity() {
 
     private val contactPicker = registerForActivityResult(ActivityResultContracts.PickContact()) { uri ->
         uri ?: return@registerForActivityResult
-        val cursor: Cursor? = contentResolver.query(uri, arrayOf(
-            ContactsContract.CommonDataKinds.Phone.NUMBER,
-            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
-        ), null, null, null)
-        cursor?.use {
-            if (it.moveToFirst()) {
-                val raw = it.getString(0) ?: return@use
-                val name = it.getString(1) ?: raw
-                val clean = raw.replace(Regex("[^0-9+]"), "")
-                if (clean.isNotEmpty()) openChat(clean, name)
+        try {
+            // Step 1: Get the contact ID from the returned URI
+            val contactId = contentResolver.query(
+                uri, arrayOf(ContactsContract.Contacts._ID), null, null, null
+            )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+
+            if (contactId != null) {
+                // Step 2: Query phone numbers for this contact ID
+                contentResolver.query(
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                    arrayOf(
+                        ContactsContract.CommonDataKinds.Phone.NUMBER,
+                        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
+                    ),
+                    "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID} = ?",
+                    arrayOf(contactId), null
+                )?.use { c ->
+                    if (c.moveToFirst()) {
+                        val raw = c.getString(0) ?: return@use
+                        val name = c.getString(1) ?: raw
+                        val clean = raw.replace(Regex("[^0-9+]"), "")
+                        if (clean.isNotEmpty()) openChat(clean, name)
+                    }
+                }
             }
-        }
+        } catch (_: Exception) { /* Silently handle malformed contact data */ }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,13 +94,37 @@ class HomeActivity : AppCompatActivity() {
 
     private fun loadConversations() {
         io.execute {
-            val convs = db.messageDao().getAllConversations()
+            val convs = db.messageDao().getAllConversations().toMutableList()
+            // Resolve missing contact names from the phone book
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                for (i in convs.indices) {
+                    val c = convs[i]
+                    if (c.contactName.isEmpty() || c.contactName == c.phoneNumber) {
+                        val resolved = resolveContactName(c.phoneNumber)
+                        if (resolved != null && resolved != c.phoneNumber) {
+                            val updated = c.copy(contactName = resolved)
+                            convs[i] = updated
+                            db.messageDao().upsertConversation(updated)
+                        }
+                    }
+                }
+            }
             runOnUiThread {
                 adapter.submitList(convs)
                 binding.emptyState.visibility = if (convs.isEmpty()) View.VISIBLE else View.GONE
                 binding.conversationList.visibility = if (convs.isEmpty()) View.GONE else View.VISIBLE
             }
         }
+    }
+
+    private fun resolveContactName(phone: String): String? {
+        return try {
+            val uri = android.net.Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI, android.net.Uri.encode(phone)
+            )
+            contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        } catch (_: Exception) { null }
     }
 
     private fun showNewChatDialog() {
