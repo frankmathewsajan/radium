@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.view.View
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -30,6 +31,33 @@ class HomeActivity : AppCompatActivity() {
 
     companion object {
         const val DEFAULT_SERVER = "+919497182886"
+    }
+
+    // --- NEW: The Vault File Picker ---
+    private val modelPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@registerForActivityResult
+
+        Toast.makeText(this, "Mounting Neural Engine... This may take a minute.", Toast.LENGTH_LONG).show()
+
+        io.execute {
+            try {
+                // 1. Stream the 2GB file from Downloads into the App's secure Vault
+                val safePath = LocalAiBridge.secureModelToSandbox(this@HomeActivity, uri, "llama-3.2-3b-q4.gguf")
+
+                // 2. Boot the C++ Metal Engine
+                val isAwake = LocalAiBridge.bootNeuralEngine(safePath)
+
+                runOnUiThread {
+                    if (isAwake) {
+                        Toast.makeText(this@HomeActivity, "NPU Online. The Ghost is awake.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this@HomeActivity, "Failed to boot Neural Engine. Check Logcat.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this@HomeActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }
     }
 
     private val contactPicker = registerForActivityResult(ActivityResultContracts.PickContact()) { uri ->
@@ -84,6 +112,12 @@ class HomeActivity : AppCompatActivity() {
         binding.conversationList.adapter = adapter
 
         binding.chipDefaultServer.setOnClickListener { openChat(DEFAULT_SERVER, "Default Server") }
+
+        // --- NEW: Trigger the File Picker ---
+        binding.chipMountNpu.setOnClickListener {
+            modelPicker.launch(arrayOf("application/octet-stream", "*/*"))
+        }
+
         binding.fabNewChat.setOnClickListener { showNewChatDialog() }
     }
 

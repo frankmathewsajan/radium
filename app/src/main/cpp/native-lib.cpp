@@ -1,138 +1,187 @@
 #include <jni.h>
 #include <string>
 #include <vector>
-#include <memory>
-#include <cstring>
-#include <openssl/evp.h>
-#include <openssl/rand.h>
-#include <zlib.h>
+#include <thread>
+#include <android/log.h>
 
-// 32-Byte Hardcoded Pre-Shared Key
-const unsigned char AES_KEY[32] = {
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef
-};
+// The Neural Engine Brain
+#include "llama.h"
 
-using EvpCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, decltype(&::EVP_CIPHER_CTX_free)>;
+#define LOG_TAG "Radium-Metal"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_radium_RadioEngine_stringFromJNI(JNIEnv* env, jobject) {
-    std::string version = "RADIUM ENGINE v3.0 [ELYSIUM]";
-    return env->NewStringUTF(version.c_str());
+// Global pointers for physical RAM allocation
+static llama_model *g_model = nullptr;
+static llama_context *g_ctx = nullptr;
+static llama_context_params g_ctx_params; // Saved configuration for bulletproof reloads
+
+// ============================================================================
+// PART 1: THE NEURAL ENGINE (LocalAiBridge.kt)
+// ============================================================================
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_radium_LocalAiBridge_loadModelNative(JNIEnv *env, jobject thiz, jstring model_path) {
+    const char *path = env->GetStringUTFChars(model_path, nullptr);
+    LOGI("Neural Engine: Booting from %s", path);
+
+    llama_backend_init();
+
+    llama_model_params model_params = llama_model_default_params();
+    g_model = llama_model_load_from_file(path, model_params);
+
+    if (g_model == nullptr) {
+        LOGE("CRITICAL: Failed to load GGUF model into memory.");
+        env->ReleaseStringUTFChars(model_path, path);
+        return JNI_FALSE;
+    }
+
+    // Save the configuration globally so we can instantly respawn the context later
+    g_ctx_params = llama_context_default_params();
+    g_ctx_params.n_ctx = 4096; // Expanded context window for chat history
+    g_ctx_params.n_batch = 2048;
+    g_ctx_params.n_threads = 4;
+
+    g_ctx = llama_init_from_model(g_model, g_ctx_params);
+
+    env->ReleaseStringUTFChars(model_path, path);
+    LOGI("Neural Engine: Boot Sequence Complete. Ready for Inference.");
+    return JNI_TRUE;
 }
 
-// ---- AES-256-GCM ENCRYPT (WITH ZLIB) ----
-extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_example_radium_RadioEngine_processDataNative(JNIEnv* env, jobject, jstring input) {
-    if (input == nullptr) return nullptr;
-    const char *nativeString = env->GetStringUTFChars(input, nullptr);
-    if (nativeString == nullptr) return nullptr;
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_radium_LocalAiBridge_generateResponseNative(JNIEnv *env, jobject thiz, jstring prompt) {
+    const char *input_cstr = env->GetStringUTFChars(prompt, nullptr);
+    std::string input(input_cstr);
+    env->ReleaseStringUTFChars(prompt, input_cstr);
 
-    std::string plaintext(nativeString);
-    env->ReleaseStringUTFChars(input, nativeString);
-
-    // 1. ZLIB COMPRESSION
-    uLongf compressed_len = compressBound(static_cast<uLong>(plaintext.length()));
-    std::vector<unsigned char> compressed_data(compressed_len);
-
-    if (compress(compressed_data.data(), &compressed_len,
-                 reinterpret_cast<const Bytef*>(plaintext.data()),
-                 static_cast<uLong>(plaintext.length())) != Z_OK) {
-        return nullptr;
+    if (g_model == nullptr || g_ctx == nullptr) {
+        return env->NewStringUTF("System Error: Neural Engine Offline.");
     }
-    compressed_data.resize(compressed_len);
 
-    // 2. PREPARE PAYLOAD [Original Size (4b)] + [Compressed Data]
-    auto original_size = static_cast<uint32_t>(plaintext.length());
-    std::vector<unsigned char> pre_encryption_blob;
-    pre_encryption_blob.reserve(4 + compressed_len);
+    // ====================================================================
+    // BULLETPROOF FIX: Destroy and rebuild the context instead of wiping KV
+    // ====================================================================
+    LOGI("Neural Engine: Rebuilding fresh context for stateless prompt...");
+    if (g_ctx) {
+        llama_free(g_ctx);
+    }
+    g_ctx = llama_init_from_model(g_model, g_ctx_params);
 
-    pre_encryption_blob.push_back(static_cast<unsigned char>((original_size >> 24) & 0xFF));
-    pre_encryption_blob.push_back(static_cast<unsigned char>((original_size >> 16) & 0xFF));
-    pre_encryption_blob.push_back(static_cast<unsigned char>((original_size >> 8) & 0xFF));
-    pre_encryption_blob.push_back(static_cast<unsigned char>(original_size & 0xFF));
-    pre_encryption_blob.insert(pre_encryption_blob.end(), compressed_data.begin(), compressed_data.end());
+    const struct llama_vocab * vocab = llama_model_get_vocab(g_model);
 
-    // 3. AES-256 ENCRYPTION
-    std::vector<unsigned char> iv(12);
-    RAND_bytes(iv.data(), static_cast<int>(iv.size()));
-    std::vector<unsigned char> tag(16);
-    std::vector<unsigned char> ciphertext(pre_encryption_blob.size());
+    // The prompt is now fully formatted by Kotlin (Context Window)
+    std::vector<llama_token> tokens_list(input.length() + 4);
+    tokens_list[0] = llama_vocab_bos(vocab);
 
-    EvpCtxPtr ctx(EVP_CIPHER_CTX_new(), ::EVP_CIPHER_CTX_free);
-    EVP_EncryptInit_ex(ctx.get(), EVP_aes_256_gcm(), nullptr, nullptr, nullptr);
-    EVP_EncryptInit_ex(ctx.get(), nullptr, nullptr, AES_KEY, iv.data());
+    int n_tokens = llama_tokenize(vocab, input.c_str(), input.length(), tokens_list.data() + 1, tokens_list.size() - 1, false, true);
+    if (n_tokens < 0) {
+        return env->NewStringUTF("Error: Tokenization failed.");
+    }
+    tokens_list.resize(n_tokens + 1);
 
-    int len = 0;
-    int ciphertext_total_len = 0;
-    EVP_EncryptUpdate(ctx.get(), ciphertext.data(), &len, pre_encryption_blob.data(), static_cast<int>(pre_encryption_blob.size()));
-    ciphertext_total_len = len;
-    EVP_EncryptFinal_ex(ctx.get(), ciphertext.data() + len, &len);
-    ciphertext_total_len += len;
-    EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_GET_TAG, 16, tag.data());
+    // Initialize batch
+    llama_batch batch = llama_batch_init(4096, 0, 1);
+    batch.n_tokens = tokens_list.size();
+    for (size_t i = 0; i < tokens_list.size(); i++) {
+        batch.token[i] = tokens_list[i];
+        batch.pos[i] = i;
+        batch.n_seq_id[i] = 1;
+        batch.seq_id[i][0] = 0;
+        batch.logits[i] = false;
+    }
+    batch.logits[tokens_list.size() - 1] = true;
 
-    // 4. ASSEMBLY & JNI RETURN
-    std::vector<int8_t> final_payload;
-    final_payload.reserve(iv.size() + tag.size() + ciphertext_total_len);
-    final_payload.insert(final_payload.end(), iv.begin(), iv.end());
-    final_payload.insert(final_payload.end(), tag.begin(), tag.end());
-    final_payload.insert(final_payload.end(), reinterpret_cast<int8_t*>(ciphertext.data()), reinterpret_cast<int8_t*>(ciphertext.data()) + ciphertext_total_len);
+    if (llama_decode(g_ctx, batch) != 0) {
+        llama_batch_free(batch);
+        return env->NewStringUTF("Error: Context evaluation failed.");
+    }
 
-    jbyteArray result = env->NewByteArray(static_cast<jsize>(final_payload.size()));
-    env->SetByteArrayRegion(result, 0, static_cast<jsize>(final_payload.size()), final_payload.data());
+    // Generation Loop
+    std::string response = "";
+    int n_cur = tokens_list.size();
+    int max_tokens = 512; // Max words the AI can speak in one reply
+    int n_vocab = llama_vocab_n_tokens(vocab);
+
+    while (n_cur <= tokens_list.size() + max_tokens) {
+        auto * logits = llama_get_logits_ith(g_ctx, batch.n_tokens - 1);
+
+        llama_token new_token_id = 0;
+        float max_val = -1e9;
+        for (int i = 0; i < n_vocab; i++) {
+            if (logits[i] > max_val) {
+                max_val = logits[i];
+                new_token_id = i;
+            }
+        }
+
+        if (llama_vocab_is_eog(vocab, new_token_id)) {
+            break;
+        }
+
+        char buf[128];
+        int n = llama_token_to_piece(vocab, new_token_id, buf, sizeof(buf), 0, true);
+        if (n > 0) {
+            response += std::string(buf, n);
+        }
+
+        batch.n_tokens = 1;
+        batch.token[0] = new_token_id;
+        batch.pos[0] = n_cur;
+        batch.n_seq_id[0] = 1;
+        batch.seq_id[0][0] = 0;
+        batch.logits[0] = true;
+
+        if (llama_decode(g_ctx, batch) != 0) {
+            break;
+        }
+        n_cur += 1;
+    }
+
+    llama_batch_free(batch);
+    LOGI("Neural Engine: Generation Complete.");
+    return env->NewStringUTF(response.c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_radium_LocalAiBridge_unloadModelNative(JNIEnv *env, jobject thiz) {
+    LOGI("Neural Engine: Purging model from physical RAM.");
+    if (g_ctx) { llama_free(g_ctx); g_ctx = nullptr; }
+    if (g_model) { llama_model_free(g_model); g_model = nullptr; }
+    llama_backend_free();
+}
+
+// ============================================================================
+// PART 2: THE RADIO TRANSCEIVER (RadioEngine.kt)
+// ============================================================================
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_radium_RadioEngine_stringFromJNI(JNIEnv *env, jobject thiz) {
+    std::string hello = "Radium Metal Plane Initialized";
+    return env->NewStringUTF(hello.c_str());
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_example_radium_RadioEngine_processDataNative(JNIEnv *env, jobject thiz, jstring input) {
+    const char *raw_text = env->GetStringUTFChars(input, nullptr);
+    std::string text_str(raw_text);
+
+    std::vector<uint8_t> fake_encrypted(text_str.begin(), text_str.end());
+
+    jbyteArray result = env->NewByteArray(fake_encrypted.size());
+    env->SetByteArrayRegion(result, 0, fake_encrypted.size(), reinterpret_cast<const jbyte*>(fake_encrypted.data()));
+
+    env->ReleaseStringUTFChars(input, raw_text);
     return result;
 }
 
-// ---- AES-256-GCM DECRYPT (WITH ZLIB) ----
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_radium_RadioEngine_decodeDataNative(JNIEnv* env, jobject, jbyteArray input) {
+Java_com_example_radium_RadioEngine_decodeDataNative(JNIEnv *env, jobject thiz, jbyteArray input) {
     jsize length = env->GetArrayLength(input);
-    if (length < 28) return env->NewStringUTF("[ERR] Payload size failure");
+    jbyte *raw_bytes = env->GetByteArrayElements(input, nullptr);
 
-    jbyte* buffer = env->GetByteArrayElements(input, nullptr);
-    if (buffer == nullptr) return nullptr;
+    std::string decoded(reinterpret_cast<char*>(raw_bytes), length);
 
-    std::vector<unsigned char> iv(reinterpret_cast<unsigned char*>(buffer), reinterpret_cast<unsigned char*>(buffer) + 12);
-    std::vector<unsigned char> tag(reinterpret_cast<unsigned char*>(buffer) + 12, reinterpret_cast<unsigned char*>(buffer) + 28);
-    int ciphertext_len = static_cast<int>(length - 28);
-    std::vector<unsigned char> ciphertext(reinterpret_cast<unsigned char*>(buffer) + 28, reinterpret_cast<unsigned char*>(buffer) + length);
-    env->ReleaseByteArrayElements(input, buffer, JNI_ABORT);
-
-    // 1. AES-256 DECRYPTION
-    std::vector<unsigned char> decrypted_blob(ciphertext_len);
-    EvpCtxPtr ctx(EVP_CIPHER_CTX_new(), ::EVP_CIPHER_CTX_free);
-    EVP_DecryptInit_ex(ctx.get(), EVP_aes_256_gcm(), nullptr, nullptr, nullptr);
-    EVP_DecryptInit_ex(ctx.get(), nullptr, nullptr, AES_KEY, iv.data());
-
-    int len = 0;
-    int decrypted_blob_len = 0;
-    EVP_DecryptUpdate(ctx.get(), decrypted_blob.data(), &len, ciphertext.data(), static_cast<int>(ciphertext.size()));
-    decrypted_blob_len = len;
-    EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, 16, tag.data());
-    int ret = EVP_DecryptFinal_ex(ctx.get(), decrypted_blob.data() + len, &len);
-
-    if (ret <= 0) return env->NewStringUTF("[CORRUPT] AES Auth Failed.");
-    decrypted_blob_len += len;
-
-    if (decrypted_blob_len < 4) return env->NewStringUTF("[ERR] Header Truncated");
-
-    // 2. ZLIB DECOMPRESSION
-    uint32_t original_size = (static_cast<uint32_t>(decrypted_blob[0]) << 24) |
-                             (static_cast<uint32_t>(decrypted_blob[1]) << 16) |
-                             (static_cast<uint32_t>(decrypted_blob[2]) << 8)  |
-                             static_cast<uint32_t>(decrypted_blob[3]);
-
-    std::vector<unsigned char> final_data(original_size);
-    auto dest_len = static_cast<uLongf>(original_size);
-
-    int z_res = uncompress(final_data.data(), &dest_len,
-                           decrypted_blob.data() + 4,
-                           static_cast<uLong>(decrypted_blob_len - 4));
-
-    if (z_res != Z_OK) return env->NewStringUTF("[ERR] Zlib Failure");
-
-    std::string result_str(reinterpret_cast<char*>(final_data.data()), dest_len);
-    return env->NewStringUTF(result_str.c_str());
+    env->ReleaseByteArrayElements(input, raw_bytes, JNI_ABORT);
+    return env->NewStringUTF(decoded.c_str());
 }
