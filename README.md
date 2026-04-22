@@ -1,3 +1,76 @@
+# Project Radium: Sovereign Neural Transceiver
+
+## 1. Core Objective
+
+Radium is designed to bridge the gap between secure, off-grid communication and local, privacy-preserving intelligence. It transforms a standard Android device into a self-contained "Ghost in the Machine"—a platform capable of executing high-reasoning tasks (Llama 3.2) without a single byte of data ever touching the public internet or a third-party cloud.
+
+## 2. The Architectural "Truths"
+
+### The Hybrid Transceiver
+Unlike standard apps, Radium operates on two planes. The **Signaling Plane** uses Port 8080 Data-SMS for radio-level communication, while the **Neural Plane** routes local prompts to an on-device NPU via an optimized C++ JNI bridge.
+
+### Hardware-First Deployment
+Radium doesn't assume flagship power. It features an integrated **Hardware Profiler** that audits physical RAM on-boot to recommend a quantized model (0.5B to 3B parameters) that matches the device's specific compute ceiling.
+
+### Stateless Metal / Stateful Kotlin
+To maximize stability, the C++ Neural Engine (`llama.cpp`) is kept entirely stateless—wiping its KV cache after every prompt. Contextual memory (the "ChatGPT feel") is managed via a Kotlin-driven **Sliding Window**, which reconstructs conversation history from a local Room Database before each inference turn.
+
+### The Vault Protocol
+All intelligence assets (GGUF models) are siloed within an internal app sandbox. The **OTA Downloader** streams models directly from Hugging Face, bypassing Android's Scoped Storage limitations to provide the C++ engine with bare-metal read access.
+
+## 3. Technical Specs
+
+| Component | Technology |
+| :--- | :--- |
+| **Neural Engine** | `llama.cpp` (C++17) via Android NDK |
+| **Crypto/Compression** | OpenSSL (AES-256-GCM), Zlib |
+| **Messaging** | Data-SMS (Binary SMS over Port 8080) |
+| **Database** | SQLite / Room (Encrypted BLOB storage) |
+| **Min SDK** | API 31 (Android 12+) |
+| **Inference Path** | JNI -> NDK -> CPU/NPU (GGUF Quantized) |
+
+## 4. Key Operation Modes
+
+- **Thinking Mode:** Deep, step-by-step reasoning via high-entropy system prompt injection.
+- **Fast Mode:** One-sentence, high-velocity response optimization.
+- **Ghost Link:** Direct SMS-over-Radio communication for true off-grid signal parity.
+
+---
+
+## 5. Building from Source & Installation
+
+Radium is a high-tier engineering platform, and its build environment must be configured exactly to ensure the native JNI bridge and cryptography compile correctly.
+
+### Prerequisites
+
+| Tool | Version |
+| :--- | :--- |
+| **Android Studio** | Ladybug (or newer) |
+| **Android SDK** | API 36 (compileSdk) |
+| **Android NDK** | `28.2.13676358` (Mandatory for 16KB boundary support) |
+| **CMake** | `3.22.1` |
+
+### Environment Setup
+
+The C++ toolchain uses OpenSSL and Zlib via Android's Prefab system. These are declared in the version catalog and do not require manual download, but a Gradle sync is mandatory. 
+
+```bash
+# 1. Clone the sovereign repository
+git clone https://github.com/frankmathewsajan/radium.git
+cd radium
+
+# 2. Open the project in Android Studio to trigger a full Gradle Sync 
+# (This downloads the necessary OpenSSL/Zlib prefab binaries)
+
+# 3. Compile the debug build including the native NDK libraries
+./gradlew :app:assembleDebug
+```
+
+*The generated APK will be output to `app/build/outputs/apk/debug/app-debug.apk`.*
+
+### Installation Guidelines
+
+Due to the deep radio hardware integration and secure storage access, Android 12+ (API 31) is strictly required. Upon first launch, Radium will execute the **Hardware Profiler** to determine the optimal model weights to securely download to the internal encrypted Vault.
 # Radium
 
 **The Off-Grid Signaling Transceiver.**
