@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.telephony.*
+import android.view.View
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -39,9 +40,13 @@ class ChatActivity : AppCompatActivity() {
     private var targetNumber = ""
     private var contactName = ""
     private var lastInsertedId: Long = -1
+    private var isThinkingMode = false
+
+    private val aiPrefs by lazy { getSharedPreferences("radium_ai", Context.MODE_PRIVATE) }
 
     companion object {
         const val GHOST_CONTACT_NPU = "0000000000"
+        private const val KEY_THINKING_MODE = "thinking_mode"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,6 +70,13 @@ class ChatActivity : AppCompatActivity() {
         binding.chatSubtitle.text = if (targetNumber == GHOST_CONTACT_NPU) "On-Device Neural Engine" else targetNumber
         binding.btnBack.setOnClickListener { finish() }
 
+        isThinkingMode = aiPrefs.getBoolean(KEY_THINKING_MODE, false)
+        binding.switchThinkingMode.isChecked = isThinkingMode
+        binding.switchThinkingMode.setOnCheckedChangeListener { _, checked ->
+            isThinkingMode = checked
+            aiPrefs.edit().putBoolean(KEY_THINKING_MODE, checked).apply()
+        }
+
         adapter = MessageAdapter()
         binding.messageList.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
         binding.messageList.adapter = adapter
@@ -72,8 +84,11 @@ class ChatActivity : AppCompatActivity() {
         binding.btnSend.setOnClickListener { sendMessage() }
 
         if (targetNumber != GHOST_CONTACT_NPU) {
+            binding.switchThinkingMode.visibility = View.GONE
             registerSmsReceivers()
             startTelemetry()
+        } else {
+            binding.switchThinkingMode.visibility = View.VISIBLE
         }
 
         loadMessages()
@@ -137,6 +152,16 @@ class ChatActivity : AppCompatActivity() {
     // --- NEW: Llama 3 Sliding Window Context Formatter ---
     private fun buildLlamaContextWindow(messages: List<MessageEntity>): String {
         val sb = java.lang.StringBuilder()
+
+        val systemPrompt = if (isThinkingMode) {
+            "You are Radium, an advanced tactical AI. Analyze the user's request deeply, reason step-by-step, and provide a comprehensive answer with clear trade-offs."
+        } else {
+            "You are Radium. Be concise and direct. Answer in 1 to 2 sentences. No fluff."
+        }
+        sb.append("<|start_header_id|>system<|end_header_id|>\n\n")
+            .append(systemPrompt)
+            .append("<|eot_id|>")
+
         // Take the last 6 messages (3 turns) so we don't blow up the 4096 RAM limit
         val contextWindow = messages.takeLast(6)
 

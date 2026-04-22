@@ -38,6 +38,8 @@ class OnboardingActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        val profile = HardwareScanner.runDiagnostics(this)
+
         // Skip if all permissions already granted
         missingSlides = allSlides.filter {
             ContextCompat.checkSelfPermission(this, it.permission) != PackageManager.PERMISSION_GRANTED
@@ -56,6 +58,8 @@ class OnboardingActivity : AppCompatActivity() {
             v.updatePadding(top = sys.top, bottom = sys.bottom)
             insets
         }
+
+        binding.onboardingHardwareSummary.text = profile.onboardingMessage
 
         binding.onboardingPager.adapter = object : FragmentStateAdapter(this) {
             override fun getItemCount() = missingSlides.size

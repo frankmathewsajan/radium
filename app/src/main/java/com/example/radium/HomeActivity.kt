@@ -20,6 +20,7 @@ import com.example.radium.data.ConversationEntity
 import com.example.radium.data.RadiumDatabase
 import com.example.radium.databinding.ActivityHomeBinding
 import com.example.radium.databinding.DialogNewChatBinding
+import java.io.File
 import java.util.concurrent.Executors
 
 class HomeActivity : AppCompatActivity() {
@@ -31,33 +32,6 @@ class HomeActivity : AppCompatActivity() {
 
     companion object {
         const val DEFAULT_SERVER = "+919497182886"
-    }
-
-    // --- NEW: The Vault File Picker ---
-    private val modelPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri ?: return@registerForActivityResult
-
-        Toast.makeText(this, "Mounting Neural Engine... This may take a minute.", Toast.LENGTH_LONG).show()
-
-        io.execute {
-            try {
-                // 1. Stream the 2GB file from Downloads into the App's secure Vault
-                val safePath = LocalAiBridge.secureModelToSandbox(this@HomeActivity, uri, "llama-3.2-3b-q4.gguf")
-
-                // 2. Boot the C++ Metal Engine
-                val isAwake = LocalAiBridge.bootNeuralEngine(safePath)
-
-                runOnUiThread {
-                    if (isAwake) {
-                        Toast.makeText(this@HomeActivity, "NPU Online. The Ghost is awake.", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@HomeActivity, "Failed to boot Neural Engine. Check Logcat.", Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                runOnUiThread { Toast.makeText(this@HomeActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show() }
-            }
-        }
     }
 
     private val contactPicker = registerForActivityResult(ActivityResultContracts.PickContact()) { uri ->
@@ -110,13 +84,11 @@ class HomeActivity : AppCompatActivity() {
         adapter = ConversationAdapter { conv -> openChat(conv.phoneNumber, conv.contactName) }
         binding.conversationList.layoutManager = LinearLayoutManager(this)
         binding.conversationList.adapter = adapter
+        mountActiveModelIfPresent()
 
         binding.chipDefaultServer.setOnClickListener { openChat(DEFAULT_SERVER, "Default Server") }
 
-        // --- NEW: Trigger the File Picker ---
-        binding.chipMountNpu.setOnClickListener {
-            modelPicker.launch(arrayOf("application/octet-stream", "*/*"))
-        }
+        binding.chipMountNpu.setOnClickListener { showModelVaultDialog() }
 
         binding.fabNewChat.setOnClickListener { showNewChatDialog() }
     }
@@ -193,5 +165,72 @@ class HomeActivity : AppCompatActivity() {
             putExtra("number", number)
             putExtra("name", name)
         })
+    }
+
+    private fun mountActiveModelIfPresent() {
+        io.execute {
+            val modelPath = LocalAiBridge.getActiveModelPath(this@HomeActivity) ?: return@execute
+            LocalAiBridge.bootNeuralEngine(modelPath)
+        }
+    }
+
+    private fun showModelVaultDialog() {
+        val profile = HardwareScanner.runDiagnostics(this)
+        val options = profile.options
+        var selectedIndex = 0
+        val labels = options.mapIndexed { index, option ->
+            val tierTag = if (index == 0) "Recommended" else "Alternative"
+            "$tierTag: ${option.displayName} (${option.maxContextWindow} ctx)"
+        }.toTypedArray()
+
+        AlertDialog.Builder(this, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog)
+            .setTitle("Hardware Profiler")
+            .setMessage(profile.onboardingMessage)
+            .setSingleChoiceItems(labels, selectedIndex) { _, which -> selectedIndex = which }
+            .setPositiveButton("Download OTA") { _, _ ->
+                downloadAndBootModel(options[selectedIndex])
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun downloadAndBootModel(option: HardwareScanner.ModelOption) {
+        binding.downloadContainer.visibility = View.VISIBLE
+        binding.chipMountNpu.isEnabled = false
+        binding.downloadProgressBar.progress = 0
+        binding.downloadStatusText.text = "Preparing ${option.displayName}..."
+
+        val destFile = File(filesDir, option.fileName)
+        io.execute {
+            ModelDownloader.downloadModelOta(
+                targetUrl = option.downloadUrl,
+                destFile = destFile,
+                onProgress = { percent, text ->
+                    runOnUiThread {
+                        binding.downloadProgressBar.progress = percent
+                        binding.downloadStatusText.text = "Downloading ${option.displayName}: $text"
+                    }
+                },
+                onSuccess = {
+                    val isAwake = LocalAiBridge.switchModel(this@HomeActivity, option.fileName)
+                    runOnUiThread {
+                        binding.downloadContainer.visibility = View.GONE
+                        binding.chipMountNpu.isEnabled = true
+                        if (isAwake) {
+                            Toast.makeText(this@HomeActivity, "NPU Online. Active model: ${option.displayName}", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this@HomeActivity, "Model boot failed.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                },
+                onError = { errorMsg ->
+                    runOnUiThread {
+                        binding.downloadContainer.visibility = View.GONE
+                        binding.chipMountNpu.isEnabled = true
+                        Toast.makeText(this@HomeActivity, "Download failed: $errorMsg", Toast.LENGTH_LONG).show()
+                    }
+                }
+            )
+        }
     }
 }

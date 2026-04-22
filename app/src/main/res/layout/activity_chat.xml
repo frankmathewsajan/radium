@@ -57,6 +57,17 @@
                     android:textSize="12sp"
                     android:maxLines="1" />
             </LinearLayout>
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switchThinkingMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Deep"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:showText="true"
+                android:checked="false"
+                android:paddingEnd="8dp" />
         </LinearLayout>
 
         <!-- Messages -->
